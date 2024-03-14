@@ -1,21 +1,73 @@
 let fs = require('fs');
 
 const xlsx = require('xlsx');
-const sql = require('mssql')
 
-async function conectar() {
-    try {
-        // make sure that any items are correctly URL encoded in the connection string
-        await sql.connect('Server=omnius,1433;Database=PRESUPUESTO;User Id=sa;Password=Carmen22;Encrypt=true')
-        const result = await sql.query`select 1 `
-        console.dir(result)
-    } catch (err) {
-        console.log(err)
-        // ... error checks
+const { Connection, Request } = require('tedious');
+
+// Configura la conexión a la base de datos
+const config = {
+  server: '192.168.0.44',
+  authentication: {
+    type: 'default',
+    options: {
+      userName: 'sa',
+      password: 'Carmen22'
     }
+  },
+  options: {
+    // Si necesitas establecer una base de datos predeterminada
+    // database: 'PRESUPUESTO',
+    encrypt: true // Establecer a true si estás usando cifrado SSL/TLS
+  }
 };
 
-conectar();
+// Crear una nueva conexión a la base de datos
+const connection = new Connection(config);
+
+// Manejar eventos de conexión
+connection.on('connect', (err) => {
+  if (err) {
+    console.error('Error al conectar:', err.message);
+  } else {
+    console.log('Conexión exitosa.');
+
+    // Ejecutar una consulta
+    executeStatement();
+  }
+});
+
+// Función para ejecutar una consulta
+function executeStatement() {
+  const request = new Request('select 1', (err, rowCount) => {
+    if (err) {
+      console.error('Error al ejecutar la consulta:', err.message);
+    } else {
+      console.log(`Consulta ejecutada correctamente. Filas afectadas: ${rowCount}`);
+    }
+
+    // Cerrar la conexión después de ejecutar la consulta
+    connection.close();
+  });
+
+  // Manejar eventos de resultado de la consulta
+  request.on('row', (columns) => {
+    columns.forEach((column) => {
+      console.log(`${column.metadata.colName}: ${column.value}`);
+    });
+  });
+
+  // Ejecutar la consulta
+  connection.execSql(request);
+}
+
+// Establecer manejadores de eventos para otros eventos si es necesario
+connection.on('end', () => {
+  console.log('Conexión cerrada.');
+});
+
+// Intentar conectar
+connection.connect();
+
 
 async function eliminarFilasHojaActiva(rutaArchivo, cantidadFilas) {
   const workbook = xlsx.readFile(rutaArchivo);
